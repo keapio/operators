@@ -24,6 +24,8 @@ metadata:
 spec:
   ports:
   - port: {{ $port }}
+    targetPort: mysql
+    protocol: TCP
   selector:
     app: {{ $name }}
 ---
