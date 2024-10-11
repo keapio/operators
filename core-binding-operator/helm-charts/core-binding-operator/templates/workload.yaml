@@ -1,0 +1,31 @@
+{{- $name := .Release.Name -}}
+---
+apiVersion: core.keapio.com/v1alpha1
+kind: ProvisionedService
+metadata:
+  name: {{ .Values.name }}
+spec:
+  name: {{ .Values.name }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}
+  annotations:
+    "helm.sh/hook": post-install
+spec:
+  template:
+    spec:
+      containers:
+        - name: {{ $name }}
+          image: bitnami/kubectl:latest
+          command: 
+            - /bin/sh
+            - -c
+            - |
+              kubectl patch provisionedservices.core.keapio.com {{ $name }} \
+              --type='merge' \
+              --subresource=status \
+              -p '{"status": {"binding": {"name": "{{ .Values.secret }}"}}}'
+      restartPolicy: Never
+  backoffLimit: 3

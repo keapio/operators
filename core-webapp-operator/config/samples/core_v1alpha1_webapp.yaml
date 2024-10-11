@@ -1,0 +1,20 @@
+apiVersion: core.keapio.com/v1alpha1
+kind: WebApp
+metadata:
+  name: webapp-sample
+spec:
+  # Default values copied from <project_dir>/helm-charts/webapp/values.yaml
+  connections:
+  - bindable: mybindable
+    name: myconnection
+  env:
+    VAR1: value1
+    VAR2: value2
+    VAR3: value3
+  image:
+    tag: stefanprodan/podinfo
+  name: podinfo
+  port: 9898
+  replicas: 1
+  
+  

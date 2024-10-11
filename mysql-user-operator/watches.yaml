@@ -1,0 +1,6 @@
+# Use the 'create api' subcommand to add watches to this file.
+- group: mysql.keapio.com
+  version: v1alpha1
+  kind: User
+  chart: helm-charts/mysql-user-operator
+#+kubebuilder:scaffold:watch

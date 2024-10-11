@@ -1,5 +1,0 @@
-name: podinfo
-image:
-  tag: "stefanprodan/podinfo"
-port: 9898
-replicas: 1

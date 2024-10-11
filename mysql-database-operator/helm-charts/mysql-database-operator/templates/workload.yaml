@@ -1,0 +1,161 @@
+{{- $resource := lookup "core.keapio.com/v1alpha1" "ProvisionedService" .Release.Namespace .Values.server -}}
+{{- if not $resource }}
+  {{- fail (printf "Error: ProvisionedService '%s' not found in namespace '%s'." .Values.server .Release.Namespace) -}}
+{{- end }}
+{{- $bindingName := $resource.status.binding.name -}}
+{{- $binding := lookup "v1" "Secret" .Release.Namespace $bindingName -}}
+{{- if not $binding }}
+  {{- fail (printf "Error: Secret '%s' not found in namespace '%s'." $bindingName .Release.Namespace) -}}
+{{- end }}
+{{- $host := $binding.data.host | b64dec -}}
+{{- $port := $binding.data.port | b64dec -}}
+{{- $name := .Release.Name | lower -}}
+{{- $database := randAlphaNum 25 -}}
+{{- $username := randAlphaNum 25 -}}
+{{- $password := randAlphaNum 25 -}}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+type: servicebinding.io/mysql
+stringData:
+  type: mysql
+  provider: mariadb
+  host: {{ $host }}
+  port: "{{ $port }}"
+  database: {{ $database }}
+  username: {{ $username }}
+  password: {{ $password }}
+---
+apiVersion: core.keapio.com/v1alpha1
+kind: ProvisionedService
+metadata:
+  name: {{ $name }}
+spec:
+  name: {{ $name }}
+---
+apiVersion: servicebinding.io/v1
+kind: ServiceBinding
+metadata:
+  name: {{ $name }}
+spec:
+  service:
+    apiVersion: core.keapio.com/v1alpha1
+    kind: ProvisionedService
+    name: {{ .Values.server }}
+  workload:
+    apiVersion: batch/v1
+    kind: Job
+    name: {{ $name }}-0
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}-0
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "0"
+spec:
+  template:
+    spec:
+      containers:
+        - name: {{ $name }}
+          image: mariadb:10.5
+          env:
+            - name: SERVICE_BINDING_ROOT
+              value: "/bindings"
+          command: [ "sh", "-c" ]
+          args:
+            - |
+              # Check if SERVICE_BINDING_ROOT is set
+              if [ -z "$SERVICE_BINDING_ROOT" ]; then
+                echo "Error: SERVICE_BINDING_ROOT environment variable is not set."
+                exit 1
+              fi
+
+              # Find all service bindings in the SERVICE_BINDING_ROOT
+              echo "Looking for MySQL service bindings in $SERVICE_BINDING_ROOT..."
+
+              # Loop through all directories in the SERVICE_BINDING_ROOT
+              for binding in "$SERVICE_BINDING_ROOT"/*; do
+                # Check if there's a file or directory called 'type' inside the binding directory
+                if [ -f "$binding/type" ]; then
+                  binding_type=$(cat "$binding/type")
+                  
+                  # Check if the type is MySQL
+                  if [ "$binding_type" = "mysql" ]; then
+                    echo "Found MySQL binding: $binding"
+                    
+                    # Read relevant MySQL connection details (e.g., username, password, host)
+                    MYSQL_USERNAME=$(cat "$binding/username")
+                    MYSQL_PASSWORD=$(cat "$binding/password")
+                    MYSQL_HOST=$(cat "$binding/host")
+                    MYSQL_PORT=$(cat "$binding/port")
+                    
+                    # Export them as environment variables
+                    export MYSQL_USERNAME
+                    export MYSQL_PASSWORD
+                    export MYSQL_HOST
+                    export MYSQL_PORT
+                    
+                    echo "MySQL environment variables set"
+
+                    USER_NAME="{{ $username }}"
+                    USER_PASSWORD="{{ $password }}"
+                    DATABASE="{{ $database }}"
+
+                    echo "Creating database and granting privileges..."
+
+                    echo "mysql -h$MYSQL_HOST -P$MYSQL_PORT -u$MYSQL_USERNAME -p$MYSQL_PASSWORD"
+
+                    mysql -h$MYSQL_HOST -P$MYSQL_PORT -u$MYSQL_USERNAME -p$MYSQL_PASSWORD -e "
+
+                    CREATE DATABASE \`$DATABASE\`;
+                    DROP USER IF EXISTS '$USER_NAME'@'%';
+                    CREATE USER '$USER_NAME'@'%' IDENTIFIED BY '$USER_PASSWORD';
+                    GRANT CREATE, INSERT, UPDATE, DELETE, SELECT ON \`$DATABASE\`.* TO '$USER_NAME'@'%';
+                    FLUSH PRIVILEGES;"
+
+                    # Check if the MySQL command failed
+                    if [ $? -ne 0 ]; then
+                      echo "Error creating database or granting privileges."
+                      exit 1
+                    fi
+                    echo "Database created and privileges granted."
+                    break  # Exit the loop after finding the first MySQL binding
+                  fi
+                fi
+              done
+
+              # If no MySQL binding is found
+              if [ -z "$MYSQL_USERNAME" ]; then
+                echo "No MySQL service binding found."
+                exit 1
+              fi
+      restartPolicy: Never
+  backoffLimit: 4
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}-1
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "1"
+spec:
+  template:
+    spec:
+      containers:
+        - name: {{ $name }}
+          image: bitnami/kubectl:latest
+          command: 
+            - /bin/sh
+            - -c
+            - |
+              kubectl patch provisionedservices.core.keapio.com {{ $name }} \
+              --type='merge' \
+              --subresource=status \
+              -p '{"status": {"binding": {"name": "{{ $name }}"}}}'
+      restartPolicy: Never
+

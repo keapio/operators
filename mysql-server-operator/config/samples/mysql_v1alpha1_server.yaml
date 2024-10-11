@@ -1,0 +1,9 @@
+apiVersion: mysql.keapio.com/v1alpha1
+kind: Server
+metadata:
+  name: server-sample
+spec:
+  # Default values copied from <project_dir>/helm-charts/mysql-server-operator/values.yaml
+  name: myserver
+  
+  

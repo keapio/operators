@@ -1,0 +1,12 @@
+plan: small
+region: eu
+image:
+  tag: ghcr.io/servicebinding/runtime/samples/spring-petclinic@sha256:83ab44832a1db6c03d34e758199b0d9cbf29ce5beeaac4fbf96443a63342b3d4
+port: 9898
+replicas: 1
+env:
+  VAR1: "value1"
+  VAR2: "value2"
+  VAR3: "value3"
+resources:
+  mysql: mysql-user-1

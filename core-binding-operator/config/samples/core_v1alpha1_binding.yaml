@@ -1,0 +1,10 @@
+apiVersion: core.keapio.com/v1alpha1
+kind: Binding
+metadata:
+  name: binding-sample
+spec:
+  # Default values copied from <project_dir>/helm-charts/core-binding-operator/values.yaml
+  name: my-binding-name
+  secret: my-binding-secret
+  
+  
