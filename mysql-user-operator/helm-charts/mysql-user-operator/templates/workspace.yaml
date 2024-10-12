@@ -1,21 +1,21 @@
 {{- $serverResource := lookup "core.keapio.com/v1alpha1" "ProvisionedService" .Release.Namespace .Values.server -}}
-{{- if not $serverResource }}
-  {{- fail (printf "Error: ProvisionedService '%s' not found in namespace '%s'." .Values.server .Release.Namespace) -}}
-{{- end }}
+{{- if or (not $serverResource) (not $serverResource.status.binding.name) -}}
+  {{- fail (printf "Error: ProvisionedService '%s' or binding not found in namespace '%s'." .Values.server .Release.Namespace) -}}
+{{- end -}}
 {{- $serverBindingName := $serverResource.status.binding.name -}}
 {{- $serverBinding := lookup "v1" "Secret" .Release.Namespace $serverBindingName -}}
-{{- if not $serverBinding }}
+{{- if not $serverBinding -}}
   {{- fail (printf "Error: Secret '%s' not found in namespace '%s'." $serverBindingName .Release.Namespace) -}}
-{{- end }}
+{{- end -}}
 {{- $databaseResource := lookup "core.keapio.com/v1alpha1" "ProvisionedService" .Release.Namespace .Values.database -}}
-{{- if not $databaseResource }}
-  {{- fail (printf "Error: ProvisionedService '%s' not found in namespace '%s'." .Values.database .Release.Namespace) -}}
-{{- end }}
+{{- if or (not $databaseResource) (not $databaseResource.status.binding.name) -}}
+  {{- fail (printf "Error: ProvisionedService '%s' or binding not found in namespace '%s'." .Values.database .Release.Namespace) -}}
+{{- end -}}
 {{- $databaseBindingName := $databaseResource.status.binding.name -}}
 {{- $databaseBinding := lookup "v1" "Secret" .Release.Namespace $databaseBindingName -}}
-{{- if not $databaseBinding }}
+{{- if not $databaseBinding -}}
   {{- fail (printf "Error: Secret '%s' not found in namespace '%s'." $databaseBindingName .Release.Namespace) -}}
-{{- end }}
+{{- end -}}
 {{- $name := .Release.Name | lower -}}
 {{- $host := $serverBinding.data.host | b64dec -}}
 {{- $port := $serverBinding.data.port | b64dec -}}
@@ -36,13 +36,6 @@ stringData:
   database: {{ $database }}
   username: {{ $username }}
   password: {{ $password }}
----
-apiVersion: core.keapio.com/v1alpha1
-kind: ProvisionedService
-metadata:
-  name: {{ $name }}
-spec:
-  name: {{ $name }}
 ---
 apiVersion: servicebinding.io/v1
 kind: ServiceBinding
@@ -136,13 +129,23 @@ spec:
               fi
       restartPolicy: Never
 ---
+apiVersion: core.keapio.com/v1alpha1
+kind: ProvisionedService
+metadata:
+  name: {{ $name }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "1"
+spec:
+  name: {{ $name }}
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ $name }}-1
   annotations:
     "helm.sh/hook": post-install
-    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-weight": "2"
 spec:
   template:
     spec:

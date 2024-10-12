@@ -1,9 +1,9 @@
-{{- range $key, $value := .Values.resources }}
+{{- range $key, $value := .Values.resources -}}
 {{- $resource := lookup "core.keapio.com/v1alpha1" "ProvisionedService" $.Release.Namespace $value -}}
-{{- if not $resource }}
-  {{- fail (printf "Error: ProvisionedService '%s' not found in namespace '%s'." $value $.Release.Namespace) -}}
-{{- end }}
-{{- end }}
+{{- if or (not $resource) (not $resource.status.binding.name) -}}
+  {{- fail (printf "Error: ProvisionedService '%s' or binding not found in namespace '%s'." $value $.Release.Namespace) -}}
+{{- end -}}
+{{- end -}}
 {{- $name := .Release.Name | lower -}}
 ---
 apiVersion: apps/v1

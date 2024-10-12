@@ -15,7 +15,7 @@ stringData:
   host: {{ $host }}
   port: {{ $port | quote }}
   username: {{ $username }}
-  password: {{ $password }}
+  password: root
 ---
 apiVersion: v1
 kind: Service
@@ -23,11 +23,13 @@ metadata:
   name: {{ $name }}
 spec:
   ports:
-  - port: {{ $port }}
+  - name: mysql
+    port: {{ $port }}
     targetPort: mysql
     protocol: TCP
   selector:
     app: {{ $name }}
+  type: ClusterIP
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -45,10 +47,10 @@ spec:
         app: {{ $name }}
     spec:
       containers:
-      - image: mariadb:10.5
+      - image: mariadb:10.11
         name: mysql
         env:
-        - name: MYSQL_ROOT_PASSWORD
+        - name: MARIADB_ROOT_PASSWORD
           valueFrom:
             secretKeyRef:
               name: {{ $name }}
@@ -56,34 +58,67 @@ spec:
         ports:
         - containerPort: {{ $port }}
           name: mysql
-        livenessProbe:
-          tcpSocket:
-            port: mysql
-        readinessProbe:
-          tcpSocket:
-            port: mysql
-        startupProbe:
-          tcpSocket:
-            port: mysql
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}-0
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "0"
+spec:
+  backoffLimit: 4
+  template:
+    spec:
+      containers:
+      - name: {{ $name }}-0
+        image: bitnami/kubectl:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Waiting for deployment {{ $name }} to be ready..."
+          while true; do
+            # Check if the deployment is ready
+            replicas=$(kubectl get deployment {{ $name }} -n {{ .Release.Namespace }} -o jsonpath='{.status.readyReplicas}')
+
+            # If the number of replicas is empty, set it to 0
+            if [ -z "$replicas" ]; then
+              replicas=0
+            fi
+
+            if [ "$replicas" -eq "1" ]; then
+              echo "Deployment {{ $name }} is ready."
+              break
+            else
+              echo "Deployment {{ $name }} is not ready. Waiting..."
+              sleep 5
+            fi
+          done
+      restartPolicy: Never
 ---
 apiVersion: core.keapio.com/v1alpha1
 kind: ProvisionedService
 metadata:
   name: {{ $name }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "1"
 spec:
   name: {{ $name }}       
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ $name }}
+  name: {{ $name }}-1
   annotations:
     "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "2"
 spec:
   template:
     spec:
       containers:
-        - name: {{ $name }}
+        - name: {{ $name }}-1
           image: bitnami/kubectl:latest
           command: 
             - /bin/sh
