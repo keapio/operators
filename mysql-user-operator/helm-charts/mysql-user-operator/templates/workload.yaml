@@ -107,7 +107,7 @@ spec:
                     mysql -h"$MYSQL_HOST" -P"$MYSQL_PORT" -u"$MYSQL_USERNAME" -p"$MYSQL_PASSWORD" -e "
                             DROP USER IF EXISTS '$USER_NAME'@'%';
                             CREATE USER '$USER_NAME'@'%' IDENTIFIED BY '$USER_PASSWORD';
-                            GRANT CREATE, INSERT, UPDATE, DELETE, SELECT ON \`$DATABASE\`.* TO '$USER_NAME'@'%';
+                            GRANT CREATE, INSERT, UPDATE, DELETE, SELECT, REFERENCES ON \`$DATABASE\`.* TO '$USER_NAME'@'%';
                             FLUSH PRIVILEGES;"
 
                     # Check if the MySQL command failed
