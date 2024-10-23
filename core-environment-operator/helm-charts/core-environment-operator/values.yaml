@@ -1,0 +1,8 @@
+# Default values for operator.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+title: Untitled
+user: my-user-1
+domain: my-domain-1
+plan: small

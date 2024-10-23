@@ -153,4 +153,4 @@ spec:
               --subresource=status \
               -p '{"status": {"binding": {"name": "{{ $name }}"}}}'
       restartPolicy: Never
-
+  backoffLimit: 4

@@ -1,0 +1,10 @@
+apiVersion: core.keapio.com/v1alpha1
+kind: Organization
+metadata:
+  name: organization-sample
+spec:
+  # Default values copied from <project_dir>/helm-charts/core-organization-operarator/values.yaml
+  title: Untitled
+  user: my-user-1
+  
+  

@@ -40,7 +40,7 @@ kind: Service
 metadata:
   name: {{ $name }}
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app: {{ $name }}
   ports:

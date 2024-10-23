@@ -1,0 +1,133 @@
+{{- $userResource := (lookup "core.keapio.com/v1alpha1" "User" .Release.Namespace .Values.user) -}}
+{{- if not $userResource -}}
+  {{- fail (printf "Error: User '%s' not found in namespace '%s'." .Values.user .Release.Namespace) -}}
+{{- end -}}
+{{- $organizationResource := (lookup "core.keapio.com/v1alpha1" "Organization" .Release.Namespace .Values.organization) -}}
+{{- if not $organizationResource -}}
+  {{- fail (printf "Error: Organization '%s' not found in namespace '%s'." .Values.organization .Release.Namespace) -}}
+{{- end -}}
+{{- $name := .Release.Name | lower -}}
+{{- $namespace := (cat $name "-" $organizationResource.metadata.name) | nospace -}}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $namespace }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+type: servicebinding.io/kubernetes
+stringData:
+  type: kubernetes
+  provider: vcluster
+  kubeconfig: ""
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: VCluster
+metadata:
+  name: {{ $name }}
+  namespace: {{ $namespace }}
+spec:
+  controlPlaneEndpoint:
+    host: ""
+    port: 0
+  helmRelease:
+    chart:
+      name: vcluster
+      repo: https://charts.loft.sh
+      version: 0.20.0
+    values: ""
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: {{ $name }}
+  namespace: {{ $namespace }}
+spec:
+  controlPlaneRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+    kind: VCluster
+    name: {{ $name }}
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+    kind: VCluster
+    name: {{ $name }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}-0
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "0"
+spec:
+  template:
+    spec:
+      containers:
+        - name: {{ $name }}-0
+          image: keapio/tools:latest
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              kubectl wait --for=condition=ready vcluster -n {{ $namespace }} {{ $name }} --timeout=300s
+      restartPolicy: Never
+  backoffLimit: 3
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}-1
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "1"
+spec:
+  template:
+    spec:
+      containers:
+        - name: {{ $name }}-1
+          image: keapio/tools:latest
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              # Extract the kubeconfig
+              KUBECONFIG=$(clusterctl get kubeconfig {{ $name }} -n {{ $namespace }} | base64 | tr -d '\n')
+              echo "$KUBECONFIG"
+              kubectl patch secret {{ $name }} -p="{\"data\":{\"kubeconfig\":\"$KUBECONFIG\"}}"
+      restartPolicy: Never
+  backoffLimit: 3
+---
+apiVersion: core.keapio.com/v1alpha1
+kind: ProvisionedService
+metadata:
+  name: {{ $name }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "2"
+spec:
+  name: {{ $name }}  
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}-2
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "3"
+spec:
+  template:
+    spec:
+      containers:
+        - name: {{ $name }}-2
+          image: bitnami/kubectl:latest
+          command: 
+            - /bin/sh
+            - -c
+            - |
+              kubectl patch provisionedservices.core.keapio.com {{ $name }} \
+              --type='merge' \
+              --subresource=status \
+              -p '{"status": {"binding": {"name": "{{ $name }}"}}}'
+      restartPolicy: Never
+  backoffLimit: 3

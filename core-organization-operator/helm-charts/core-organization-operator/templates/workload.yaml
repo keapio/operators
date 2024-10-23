@@ -1,0 +1,4 @@
+{{- $userResource := (lookup "core.keapio.com/v1alpha1" "User" .Release.Namespace .Values.user) -}}
+{{- if not $userResource -}}
+  {{- fail (printf "Error: User '%s' not found in namespace '%s'." .Values.user .Release.Namespace) -}}
+{{- end -}}

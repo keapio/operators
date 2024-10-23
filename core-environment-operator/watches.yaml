@@ -1,0 +1,6 @@
+# Use the 'create api' subcommand to add watches to this file.
+- group: core.keapio.com
+  version: v1alpha1
+  kind: Environment
+  chart: helm-charts/core-environment-operator
+#+kubebuilder:scaffold:watch

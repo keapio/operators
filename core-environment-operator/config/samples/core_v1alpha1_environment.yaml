@@ -1,0 +1,9 @@
+apiVersion: core.keapio.com/v1alpha1
+kind: Environment
+metadata:
+  name: environment-sample
+spec:
+  # Default values copied from <project_dir>/helm-charts/core-environment-operator/values.yaml
+  {}
+  
+  

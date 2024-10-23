@@ -1,0 +1,55 @@
+{{- $name := .Release.Name | lower -}}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $name }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: keapio-system-read
+  namespace: {{ $name }}
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["core.keapio.com"]
+  resources: ["provisionedservices", "provisionedservices/status"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: keapio-system-patch
+  namespace: {{ $name }}
+rules:
+- apiGroups: ["core.keapio.com"]
+  resources: ["provisionedservices/status"]
+  verbs: ["patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: keapio-system-read
+  namespace: {{ $name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: keapio-system-read
+subjects:
+- kind: ServiceAccount
+  name: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: keapio-system-patch
+  namespace: {{ $name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: keapio-system-patch
+subjects:
+- kind: ServiceAccount
+  name: default
